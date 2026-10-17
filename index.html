@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SiteRadar — Website Status & Uptime Monitoring Dashboard</title>
+  <meta name="description" content="Real-time website status monitoring dashboard. Track website health, response latency, 90-day sample uptime history, and incident reports.">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: ['class', '[data-theme="dark"]'],
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              500: '#10b981',
+              600: '#059669',
+            }
+          },
+          fontFamily: {
+            heading: ['Outfit', 'sans-serif'],
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body class="antialiased min-h-screen text-slate-100 flex flex-col">
+
+  <!-- ================= TOP NAVIGATION BAR ================= -->
+  <header class="sticky top-0 z-40 w-full border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      
+      <!-- Brand Logo -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-heading font-extrabold text-xl tracking-tight text-white">Site<span class="text-emerald-400">Radar</span></span>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              LIVE OPS
+            </span>
+          </div>
+          <p class="text-xs text-slate-400 hidden sm:block">Website & API Uptime Monitor</p>
+        </div>
+      </div>
+
+      <!-- Live Heartbeat / Auto-Refresh Indicator -->
+      <div class="hidden md:flex items-center gap-3 px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 radar-live"></span>
+        <span class="text-slate-400">Monitoring Cycle:</span>
+        <span id="autoPollStatus" class="text-slate-200 font-semibold font-mono">Active (15s)</span>
+        <button id="toggleAutoPollBtn" title="Toggle auto-ping simulation" class="text-indigo-400 hover:text-indigo-300 font-medium ml-1 underline">Pause</button>
+      </div>
+
+      <!-- Header Action Controls -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        
+        <!-- Public Status View Switcher -->
+        <button id="publicViewToggleBtn" class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs font-medium text-slate-300 flex items-center gap-1.5 transition">
+          <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+          </svg>
+          <span class="hidden sm:inline">Public Page</span>
+        </button>
+
+        <!-- Theme Toggle -->
+        <button id="themeToggleBtn" title="Toggle Theme" class="p-2 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 transition">
+          <svg id="themeIconSun" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 9H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+          </svg>
+          <svg id="themeIconMoon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+          </svg>
+        </button>
+
+        <!-- Run Check All Button -->
+        <button id="runCheckAllBtn" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold border border-slate-700 flex items-center gap-1.5 transition">
+          <svg id="runCheckIcon" class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          </svg>
+          <span class="hidden sm:inline">Ping All</span>
+          <span class="sm:hidden">Ping</span>
+        </button>
+
+        <!-- Add Website Button -->
+        <button id="openAddModalBtn" class="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-md shadow-emerald-600/30 flex items-center gap-1.5 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+          </svg>
+          <span>Add Website</span>
+        </button>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= MAIN CONTAINER ================= -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- GLOBAL HEALTH HERO BANNER -->
+    <section id="globalStatusBanner" class="p-5 rounded-2xl bg-gradient-to-r from-emerald-950/60 via-slate-900 to-slate-900 border border-emerald-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
+      <div class="flex items-center gap-4">
+        <div id="globalStatusIcon" class="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center shrink-0">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path>
+          </svg>
+        </div>
+        <div>
+          <h2 id="globalStatusTitle" class="text-xl font-heading font-extrabold text-white tracking-tight flex items-center gap-2">
+            <span>All Systems Operational</span>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono">100% HEALTH</span>
+          </h2>
+          <p id="globalStatusSubtitle" class="text-xs text-slate-400 mt-0.5">All monitored endpoints, APIs, and databases are responding normally.</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3 text-xs shrink-0 self-end sm:self-center">
+        <button id="openReportIncidentBtn" class="px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 font-semibold transition flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+          </svg>
+          <span>Report Incident</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- KPI STATS SUMMARY CARDS -->
+    <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      
+      <!-- Card 1: Overall Average Uptime -->
+      <div class="glass-panel p-4 flex items-center gap-3.5">
+        <div class="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+        </div>
+        <div>
+          <p class="text-xs font-medium text-slate-400">Overall Uptime</p>
+          <h3 id="statAvgUptime" class="text-xl font-heading font-bold text-white">99.85%</h3>
+          <p class="text-[11px] text-emerald-400 font-medium">Past 90 days SLA</p>
+        </div>
+      </div>
+
+      <!-- Card 2: Monitored Services -->
+      <div class="glass-panel p-4 flex items-center gap-3.5">
+        <div class="w-11 h-11 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path>
+          </svg>
+        </div>
+        <div>
+          <p class="text-xs font-medium text-slate-400">Total Services</p>
+          <h3 id="statTotalServices" class="text-xl font-heading font-bold text-white">10 Active</h3>
+          <p id="statOperationalRatio" class="text-[11px] text-slate-500">9 Operational</p>
+        </div>
+      </div>
+
+      <!-- Card 3: Average Latency -->
+      <div class="glass-panel p-4 flex items-center gap-3.5">
+        <div class="w-11 h-11 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+        </div>
+        <div>
+          <p class="text-xs font-medium text-slate-400">Avg Response Time</p>
+          <h3 id="statAvgLatency" class="text-xl font-heading font-bold text-white">84 ms</h3>
+          <p class="text-[11px] text-cyan-400 font-medium">⚡ Optimal latency</p>
+        </div>
+      </div>
+
+      <!-- Card 4: Active Incidents -->
+      <div class="glass-panel p-4 flex items-center gap-3.5">
+        <div class="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+        </div>
+        <div>
+          <p class="text-xs font-medium text-slate-400">Active Incidents</p>
+          <h3 id="statActiveIncidents" class="text-xl font-heading font-bold text-white">1 Active</h3>
+          <p id="statIncidentNote" class="text-[11px] text-amber-400 font-medium">Investigation underway</p>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ACTIVE INCIDENTS ACCORDION / HIGHLIGHT -->
+    <section id="incidentsSection" class="glass-panel p-4 border-amber-500/30">
+      <div class="flex items-center justify-between cursor-pointer" id="incidentsHeader">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping"></span>
+          <h3 class="text-sm font-heading font-bold text-white flex items-center gap-2">
+            <span>Ongoing Incident Updates</span>
+            <span id="activeIncidentCountBadge" class="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono">1 active</span>
+          </h3>
+        </div>
+        <button id="toggleIncidentsViewBtn" class="text-xs text-slate-400 hover:text-white font-medium flex items-center gap-1">
+          <span id="incidentToggleText">Collapse</span>
+          <svg id="incidentToggleIcon" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div id="incidentsListContainer" class="mt-3 space-y-3 pt-3 border-t border-slate-800">
+        <!-- Dynamically rendered active and past incidents -->
+      </div>
+    </section>
+
+    <!-- FILTER & SEARCH CONTROL STRIP -->
+    <section class="glass-panel p-3 flex flex-col md:flex-row items-center justify-between gap-3 text-xs">
+      
+      <!-- Status Filters -->
+      <div class="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0" id="statusFilterContainer">
+        <button data-status="ALL" class="status-filter-btn px-2.5 py-1.5 rounded-lg bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 font-semibold">All Services</button>
+        <button data-status="OPERATIONAL" class="status-filter-btn px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white border border-transparent font-medium">🟢 Operational</button>
+        <button data-status="DEGRADED" class="status-filter-btn px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white border border-transparent font-medium">🟡 Degraded</button>
+        <button data-status="OUTAGE" class="status-filter-btn px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white border border-transparent font-medium">🔴 Outage</button>
+        <button data-status="MAINTENANCE" class="status-filter-btn px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white border border-transparent font-medium">🟣 Maintenance</button>
+      </div>
+
+      <div class="flex items-center gap-2 w-full md:w-auto">
+        <!-- Category Dropdown -->
+        <select id="categorySelect" class="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-emerald-500">
+          <option value="ALL">All Categories</option>
+          <option value="FRONTEND">Web Frontends</option>
+          <option value="API">Core APIs</option>
+          <option value="DATABASE">Databases</option>
+          <option value="INFRA">CDN & Auth</option>
+        </select>
+
+        <!-- Search Bar -->
+        <div class="relative flex-1 md:w-60">
+          <svg class="w-4 h-4 text-slate-500 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+          </svg>
+          <input type="text" id="serviceSearchInput" placeholder="Search websites, URLs..." class="w-full bg-slate-900 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition">
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ================= WEBSITES STATUS LIST ================= -->
+    <section class="space-y-4">
+      
+      <div class="flex items-center justify-between text-xs text-slate-400 px-1">
+        <div class="flex items-center gap-2 font-medium">
+          <span>MONITORED ENDPOINTS</span>
+          <span id="filteredCountBadge" class="font-mono text-emerald-400 font-bold">(10 services)</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block"></span> Operational</span>
+          <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-amber-500 inline-block"></span> Degraded</span>
+          <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-rose-500 inline-block"></span> Outage</span>
+          <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-purple-500 inline-block"></span> Maintenance</span>
+        </div>
+      </div>
+
+      <!-- Services Container -->
+      <div id="servicesListContainer" class="space-y-3">
+        <!-- Dynamically rendered service cards -->
+      </div>
+
+      <!-- Empty State -->
+      <div id="emptyServicesContainer" class="hidden glass-panel p-12 text-center">
+        <div class="w-14 h-14 mx-auto mb-3 rounded-2xl bg-slate-800 flex items-center justify-center text-slate-400">
+          <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+          </svg>
+        </div>
+        <h4 class="text-sm font-semibold text-slate-200">No websites match your criteria</h4>
+        <p class="text-xs text-slate-400 mt-1">Try resetting your search query or filters.</p>
+        <button id="resetFiltersBtn" class="mt-4 px-3 py-1.5 rounded-lg bg-emerald-600 text-xs font-semibold text-white">Reset Filters</button>
+      </div>
+
+    </section>
+
+    <!-- UTILITIES / TOOLS ROW -->
+    <section class="glass-panel p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+      <div class="flex items-center gap-2 text-slate-400">
+        <span class="font-semibold text-slate-300">Data Management:</span>
+        <span>Auto-saves to browser LocalStorage</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <button id="exportJsonBtn" class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 font-medium transition">
+          Export Status JSON
+        </button>
+        <button id="printReportBtn" class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 font-medium transition">
+          Print SLA Report
+        </button>
+        <button id="resetDemoDataBtn" class="text-emerald-400 hover:underline font-medium">
+          Reset Sample Data
+        </button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ================= MODAL: ADD / EDIT WEBSITE SERVICE ================= -->
+  <div id="serviceModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm hidden">
+    <div class="glass-panel w-full max-w-lg p-6 relative border-emerald-500/30 max-h-[90vh] overflow-y-auto">
+      
+      <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+        <h3 id="modalTitle" class="text-base font-heading font-bold text-white">Add Monitored Website / Service</h3>
+        <button id="closeServiceModalBtn" class="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <form id="serviceForm" class="space-y-4 text-xs">
+        <input type="hidden" id="editServiceId" value="">
+
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">Service / Website Name *</label>
+          <input type="text" id="serviceNameInput" placeholder="e.g. Production E-Commerce API" required class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition">
+        </div>
+
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">Endpoint URL / Domain *</label>
+          <input type="text" id="serviceUrlInput" placeholder="https://api.example.com/health" required class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-medium text-slate-300 mb-1">Category *</label>
+            <select id="serviceCategoryInput" required class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-emerald-500">
+              <option value="FRONTEND">Web Frontend</option>
+              <option value="API" selected>Core API / Microservice</option>
+              <option value="DATABASE">Database Cluster</option>
+              <option value="INFRA">CDN / DNS / Auth</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block font-medium text-slate-300 mb-1">Environment Region</label>
+            <input type="text" id="serviceRegionInput" placeholder="e.g. US-East, Global CDN, EU-Central" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-medium text-slate-300 mb-1">Current Status *</label>
+            <select id="serviceStatusInput" required class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-emerald-500">
+              <option value="OPERATIONAL">🟢 Operational</option>
+              <option value="DEGRADED">🟡 Degraded Performance</option>
+              <option value="OUTAGE">🔴 Major Outage</option>
+              <option value="MAINTENANCE">🟣 Scheduled Maintenance</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block font-medium text-slate-300 mb-1">Latency SLA Target (ms)</label>
+            <input type="number" id="serviceTargetLatencyInput" value="200" min="10" max="5000" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-emerald-500 transition">
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">Operator Notes / Health Check Specs</label>
+          <textarea id="serviceNotesInput" rows="2" placeholder="e.g. Monitored via HTTPS GET /health check every 60s" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"></textarea>
+        </div>
+
+        <div class="pt-3 flex justify-end gap-2 border-t border-slate-800">
+          <button type="button" id="cancelServiceBtn" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium transition">
+            Cancel
+          </button>
+          <button type="submit" class="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-md shadow-emerald-600/30 transition">
+            Save Service
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: MANUAL STATUS OVERRIDE & NOTE ================= -->
+  <div id="statusOverrideModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm hidden">
+    <div class="glass-panel w-full max-w-md p-6 relative border-indigo-500/30">
+      
+      <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+        <h3 class="text-base font-heading font-bold text-white">Manual Status Override</h3>
+        <button id="closeStatusModalBtn" class="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <form id="statusOverrideForm" class="space-y-4 text-xs">
+        <input type="hidden" id="overrideServiceId" value="">
+
+        <div>
+          <p class="text-slate-400 mb-1">Target Service:</p>
+          <h4 id="overrideServiceName" class="font-bold text-slate-100 text-sm"></h4>
+        </div>
+
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">New Health Status *</label>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="p-2.5 rounded-lg border border-slate-800 bg-slate-900 cursor-pointer flex items-center gap-2 hover:border-emerald-500">
+              <input type="radio" name="manualStatus" value="OPERATIONAL" checked class="text-emerald-500">
+              <span class="font-bold text-emerald-400">Operational</span>
+            </label>
+            <label class="p-2.5 rounded-lg border border-slate-800 bg-slate-900 cursor-pointer flex items-center gap-2 hover:border-amber-500">
+              <input type="radio" name="manualStatus" value="DEGRADED" class="text-amber-500">
+              <span class="font-bold text-amber-400">Degraded</span>
+            </label>
+            <label class="p-2.5 rounded-lg border border-slate-800 bg-slate-900 cursor-pointer flex items-center gap-2 hover:border-rose-500">
+              <input type="radio" name="manualStatus" value="OUTAGE" class="text-rose-500">
+              <span class="font-bold text-rose-400">Major Outage</span>
+            </label>
+            <label class="p-2.5 rounded-lg border border-slate-800 bg-slate-900 cursor-pointer flex items-center gap-2 hover:border-purple-500">
+              <input type="radio" name="manualStatus" value="MAINTENANCE" class="text-purple-500">
+              <span class="font-bold text-purple-400">Maintenance</span>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">Reason / Public Status Message</label>
+          <input type="text" id="overrideReasonInput" placeholder="e.g. Upstream ISP latency spike, investigating" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
+        </div>
+
+        <div class="pt-3 flex justify-end gap-2 border-t border-slate-800">
+          <button type="button" id="cancelOverrideBtn" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium transition">
+            Cancel
+          </button>
+          <button type="submit" class="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition">
+            Apply Status
+          </button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+
+  <!-- ================= MODAL: REPORT INCIDENT ================= -->
+  <div id="reportIncidentModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm hidden">
+    <div class="glass-panel w-full max-w-lg p-6 relative border-amber-500/30">
+      
+      <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+        <h3 class="text-base font-heading font-bold text-white flex items-center gap-2">
+          <span class="text-amber-400">⚠️</span>
+          <span>Post Incident / Status Update</span>
+        </h3>
+        <button id="closeIncidentModalBtn" class="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <form id="incidentForm" class="space-y-4 text-xs">
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">Incident Headline *</label>
+          <input type="text" id="incidentTitleInput" placeholder="e.g. Elevated 500 error rates on Checkout API" required class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 transition">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-medium text-slate-300 mb-1">Affected Service *</label>
+            <select id="incidentServiceSelect" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-amber-500">
+              <!-- Dynamically populated options -->
+            </select>
+          </div>
+
+          <div>
+            <label class="block font-medium text-slate-300 mb-1">Current State *</label>
+            <select id="incidentStateSelect" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-amber-500">
+              <option value="Investigating" selected>🔍 Investigating</option>
+              <option value="Identified">🎯 Identified</option>
+              <option value="Monitoring">👀 Monitoring</option>
+              <option value="Resolved">✅ Resolved</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">Status Report Details *</label>
+          <textarea id="incidentMessageInput" rows="3" placeholder="Engineers are currently mitigating database pool connection limits. Next update in 15 minutes." required class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 transition"></textarea>
+        </div>
+
+        <div class="pt-3 flex justify-end gap-2 border-t border-slate-800">
+          <button type="button" id="cancelIncidentBtn" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium transition">
+            Cancel
+          </button>
+          <button type="submit" class="px-5 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold transition">
+            Publish Incident Note
+          </button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+
+  <!-- ================= TOAST NOTIFICATION CONTAINER ================= -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- ================= FOOTER ================= -->
+  <footer class="mt-auto border-t border-slate-800/80 bg-slate-950/40 py-4 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <p>SiteRadar Live Monitor — Webathon 2026. Enterprise Status Dashboard.</p>
+      <div class="flex items-center gap-4">
+        <span>Sample 90-Day SLA Engine</span>
+        <span>•</span>
+        <span>Runs 100% Client-Side</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- App Script -->
+  <script src="./app.js"></script>
+</body>
+</html>
